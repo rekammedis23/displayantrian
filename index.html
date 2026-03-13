@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Display Antrian Live - RS SS Medika</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    body { 
+      font-family: 'Public Sans', sans-serif; 
+      background-color: #f0f0f0; 
+      height: 100vh;
+      margin: 0;
+      padding: 15px; 
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .neo-box {
+      border: 4px solid #000;
+      box-shadow: 6px 6px 0px 0px #000;
+      background: white;
+    }
+
+    .header-box {
+      height: 80px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 25px;
+      margin-bottom: 20px;
+      flex-shrink: 0;
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .video-container {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .video-frame {
+      flex: 1;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+    .video-frame iframe {
+      position: absolute; width: 100%; height: 100%; top: 0; left: 0;
+    }
+
+    #antrianBoard {
+      position: relative;
+      background: #fff;
+      border: 4px solid #000;
+      box-shadow: 8px 8px 0px 0px #000;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .card-dokter {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around; 
+      align-items: center;
+      background: #22c55e;
+      color: white;
+      text-align: center;
+      padding: 30px 15px;
+      opacity: 0;
+      transform: scale(0.95);
+      transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      visibility: hidden;
+    }
+
+    .card-dokter.active { 
+      opacity: 1; 
+      transform: scale(1); 
+      visibility: visible; 
+      z-index: 10; 
+    }
+
+    .nama-dokter { 
+      font-size: clamp(1.5rem, 4vh, 2.5rem); 
+      font-weight: 900; 
+      line-height: 1.2; 
+      width: 100%;
+      padding: 10px;
+      border-bottom: 4px solid rgba(255,255,255,0.3);
+    }
+
+    .label-antrian { 
+      font-size: clamp(1rem, 2vh, 1.4rem); 
+      font-weight: 700; 
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 10px;
+    }
+
+    .number-display { 
+      font-size: clamp(4rem, 15vh, 10rem); 
+      font-weight: 900; 
+      line-height: 0.9; 
+      text-shadow: 6px 6px 0px #000; 
+      margin: 10px 0;
+    }
+
+    .btn-masuk { 
+      font-size: clamp(1rem, 2.5vh, 1.8rem); 
+      border: 4px solid #000; 
+      padding: 12px 30px; 
+      box-shadow: 5px 5px 0px #000; 
+      font-weight: 900;
+      background: white;
+      color: #16a34a;
+      margin-top: 10px;
+    }
+
+    .marquee-container {
+      margin-top: 20px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+      body { overflow-y: auto; height: auto; }
+      .main-layout { grid-template-columns: 1fr; display: flex; flex-direction: column; }
+      .video-container { height: 250px; flex: none; }
+      #antrianBoard { height: 450px; flex: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-box neo-box bg-yellow-400">
+    <h1 class="text-2xl font-black uppercase tracking-tighter">RS SS Medika</h1>
+    <div id="clock" class="text-2xl font-black">00:00:00</div>
+  </div>
+
+  <div class="main-layout">
+    <div class="video-container">
+      <div class="video-frame neo-box">
+        <div class="absolute top-2 left-2 z-50 opacity-50 hover:opacity-100">
+          <select id="channelSelector" onchange="changeChannel()" class="bg-black text-white text-xs p-1 font-bold border-2 border-white rounded">
+              <option value="yt_default">YouTube (Default)</option>
+              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGcmN0aSUyRmluZXdzaWQmaGVpZ2h0PTEwMCUyNSZ3aWR0aD0xMDAlMjU=">RCTI</option>
+              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGZ3R2JTJGaW5ld3NpZCZoZWlnaHQ9MTAwJTI1JndpZHRoPTEwMCUyNQ==">GTV</option>
+              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGbW5jdHYlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">MNCTV</option>
+              <option value="https://20.detik.com/watch/livestreaming-transtv">TRANS TV</option>
+              <option value="https://20.detik.com/watch/livestreaming-trans7">TRANS 7</option>
+              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGaW5ld3MlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">iNews</option>
+              <option value="https://www.cnnindonesia.com/tv/embed?ref=transmedia">CNN</option>
+          </select>
+        </div>
+        <iframe id="videoPlayer" src="https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8" frameborder="0" allow="autoplay; encrypted-media; fullscreen"></iframe>
+      </div>
+    </div>
+
+    <div id="antrianBoard">
+      <div class="card-dokter active" style="background: white; color: #000;">
+        <p class="text-xl font-black uppercase animate-pulse">Menghubungkan ke Server...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="marquee-container neo-box bg-blue-600 text-white">
+    <marquee class="text-2xl font-black uppercase">Selamat Datang di RS SS Medika • Harap Menunggu Antrian Anda • Semoga Lekas Sembuh</marquee>
+  </div>
+
+  <script>
+    // 🔥 GANTI DENGAN URL WEB APP GAS ANDA (HASIL DEPLOYMENT)
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec?action=getAntrianDisplay"; 
+
+    let currentIndex = 0;
+    let antrianData = [];
+    let rotationInterval;
+
+    async function updateDisplay() {
+      try {
+        // Memanggil GAS dengan parameter action yang kita buat di doGet
+        const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`);
+        const result = await response.json();
+        
+        if (result.success) {
+          const data = result.data;
+          if (!data || data.length === 0) {
+            if (antrianData.length !== 0) {
+              antrianData = [];
+              renderEmpty();
+            }
+            return;
+          }
+          // Hanya render jika data berubah untuk menghindari kedip (flicker)
+          if (JSON.stringify(antrianData) !== JSON.stringify(data)) {
+            antrianData = data;
+            renderCards();
+          }
+        }
+      } catch (err) {
+        console.error("Gagal memuat antrian:", err);
+      }
+    }
+
+    function renderEmpty() {
+      const board = document.getElementById('antrianBoard');
+      board.innerHTML = `
+        <div class="card-dokter active" style="background: white; color: #ccc;">
+          <h2 class="nama-dokter font-black uppercase" style="border:none">Belum Ada Antrian Dipanggil</h2>
+        </div>`;
+    }
+
+    function renderCards() {
+      const board = document.getElementById('antrianBoard');
+      let html = '';
+      antrianData.forEach((item, index) => {
+        html += `
+          <div class="card-dokter" id="card-${index}">
+            <h2 class="nama-dokter uppercase">${item.dokter}</h2>
+            <div>
+               <p class="label-antrian">Nomor Antrian</p>
+               <div class="number-display">${item.no_antrian}</div>
+            </div>
+            <div class="btn-masuk">SILAHKAN MASUK</div>
+          </div>`;
+      });
+      board.innerHTML = html;
+      startRotation();
+    }
+
+    function startRotation() {
+      if (rotationInterval) clearInterval(rotationInterval);
+      if (antrianData.length === 0) return;
+      currentIndex = 0;
+      showCard(0);
+      if (antrianData.length > 1) {
+        rotationInterval = setInterval(() => {
+          hideCard(currentIndex);
+          currentIndex = (currentIndex + 1) % antrianData.length;
+          showCard(currentIndex);
+        }, 8000); 
+      }
+    }
+
+    function showCard(index) {
+      const el = document.getElementById(`card-${index}`);
+      if (el) el.classList.add('active');
+    }
+
+    function hideCard(index) {
+      const el = document.getElementById(`card-${index}`);
+      if (el) el.classList.remove('active');
+    }
+
+    function changeChannel() {
+      const selector = document.getElementById('channelSelector');
+      const player = document.getElementById('videoPlayer');
+      const val = selector.value;
+      player.src = (val === 'yt_default' ? "https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8" : val);
+    }
+
+    // Jalankan Loop
+    updateDisplay();
+    setInterval(updateDisplay, 10000); // Update data tiap 10 detik
+    setInterval(() => {
+      document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID');
+    }, 1000);
+  </script>
+</body>
+</html>
