@@ -42,7 +42,7 @@
       grid-template-columns: 1.6fr 1fr;
       gap: 20px;
       flex: 1;
-      min-height: 0;
+      min-height: 0; /* Penting agar grid tidak meluap */
     }
 
     .video-container {
@@ -61,6 +61,7 @@
       position: absolute; width: 100%; height: 100%; top: 0; left: 0;
     }
 
+    /* ANTRIAN BOARD REPAIR */
     #antrianBoard {
       position: relative;
       background: #fff;
@@ -75,6 +76,7 @@
       inset: 0;
       display: flex;
       flex-direction: column;
+      /* Membagi ruang secara adil agar teks tidak tumpang tindih */
       justify-content: space-around; 
       align-items: center;
       background: #22c55e;
@@ -94,6 +96,7 @@
       z-index: 10; 
     }
 
+    /* TYPOGRAPHY WITH CLAMP (Auto Resizing) */
     .nama-dokter { 
       font-size: clamp(1.5rem, 4vh, 2.5rem); 
       font-weight: 900; 
@@ -130,6 +133,7 @@
       margin-top: 10px;
     }
 
+    /* FOOTER */
     .marquee-container {
       margin-top: 20px;
       height: 60px;
@@ -138,11 +142,14 @@
       flex-shrink: 0;
     }
 
+    /* MOBILE OPTIMIZATION */
     @media (max-width: 768px) {
       body { overflow-y: auto; height: auto; }
       .main-layout { grid-template-columns: 1fr; display: flex; flex-direction: column; }
       .video-container { height: 250px; flex: none; }
       #antrianBoard { height: 450px; flex: none; }
+      .nama-dokter { font-size: 1.5rem; }
+      .number-display { font-size: 6rem; }
     }
   </style>
 </head>
@@ -284,4 +291,5 @@
 </body>
 
 </html>
+
 
