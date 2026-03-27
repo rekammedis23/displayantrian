@@ -181,7 +181,9 @@
 
     <div id="antrianBoard">
       <div class="card-dokter active" style="background: white; color: #000;">
-        <p class="text-xl font-black uppercase animate-pulse">Menghubungkan ke Server...</p>
+        <i class="fa-solid fa-circle-info text-4xl mb-4 text-blue-600"></i>
+        <h2 class="nama-dokter font-black uppercase" style="border:none">Antrian Belum Dimulai</h2>
+        <p class="text-sm font-bold text-gray-400 animate-pulse uppercase tracking-widest">Menunggu Data Dari Server...</p>
       </div>
     </div>
   </div>
@@ -200,20 +202,20 @@
 
     async function updateDisplay() {
       try {
-        // Memanggil GAS dengan parameter action yang kita buat di doGet
         const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`);
         const result = await response.json();
         
+        // Jika sukses tetapi data kosong (belum ada yang dipanggil)
         if (result.success) {
           const data = result.data;
+          
           if (!data || data.length === 0) {
-            if (antrianData.length !== 0) {
-              antrianData = [];
-              renderEmpty();
-            }
+            antrianData = []; // Kosongkan data lokal
+            renderEmpty();    // Tampilkan pesan "Belum ada antrian"
             return;
           }
-          // Hanya render jika data berubah untuk menghindari kedip (flicker)
+          
+          // Render kartu hanya jika data berbeda (mencegah flicker)
           if (JSON.stringify(antrianData) !== JSON.stringify(data)) {
             antrianData = data;
             renderCards();
@@ -221,14 +223,18 @@
         }
       } catch (err) {
         console.error("Gagal memuat antrian:", err);
+        // Jika koneksi internet putus, tetap tampilkan pesan standby agar tidak stuck di loading
+        renderEmpty(); 
       }
     }
 
     function renderEmpty() {
       const board = document.getElementById('antrianBoard');
       board.innerHTML = `
-        <div class="card-dokter active" style="background: white; color: #ccc;">
-          <h2 class="nama-dokter font-black uppercase" style="border:none">Belum Ada Antrian Dipanggil</h2>
+        <div class="card-dokter active" style="background: white; color: #000;">
+          <i class="fa-solid fa-hospital-user text-6xl mb-4 text-gray-300"></i>
+          <h2 class="nama-dokter font-black uppercase" style="border:none">Antrian Belum Dimulai</h2>
+          <p class="label-antrian text-gray-400">Silakan menunggu panggilan petugas</p>
         </div>`;
     }
 
