@@ -192,49 +192,76 @@
     <marquee class="text-2xl font-black uppercase">Selamat Datang di RS SS Medika • Harap Menunggu Antrian Anda • Semoga Lekas Sembuh</marquee>
   </div>
 
-  <script>
-    // 🔥 GANTI DENGAN URL WEB APP GAS ANDA (HASIL DEPLOYMENT)
+<script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec"; 
 
     let currentIndex = 0;
     let antrianData = [];
     let rotationInterval;
+    let isInitialLoad = true; // Flag untuk load pertama kali
 
     async function updateDisplay() {
       try {
         const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`);
+        
+        // Cek jika response ok (status 200)
+        if (!response.ok) throw new Error("Network response was not ok");
+
         const result = await response.json();
         
-        // Jika sukses tetapi data kosong (belum ada yang dipanggil)
         if (result.success) {
           const data = result.data;
           
+          // SKENARIO A: Petugas memang belum memulai antrian (Data benar-benar kosong dari GAS)
           if (!data || data.length === 0) {
-            antrianData = []; // Kosongkan data lokal
-            renderEmpty();    // Tampilkan pesan "Belum ada antrian"
+            antrianData = []; 
+            renderEmpty();    
+            isInitialLoad = false;
             return;
           }
           
-          // Render kartu hanya jika data berbeda (mencegah flicker)
+          // SKENARIO B: Ada data antrian
+          // Hanya render ulang jika datanya berubah untuk menghindari flicker/gangguan rotasi
           if (JSON.stringify(antrianData) !== JSON.stringify(data)) {
             antrianData = data;
             renderCards();
           }
+          isInitialLoad = false;
         }
       } catch (err) {
-        console.error("Gagal memuat antrian:", err);
-        // Jika koneksi internet putus, tetap tampilkan pesan standby agar tidak stuck di loading
-        renderEmpty(); 
+        console.error("Gagal memuat antrian (Koneksi Buruk):", err);
+        
+        // PERBAIKAN: Jika error koneksi tapi sudah ada data sebelumnya (antrianData tidak kosong),
+        // jangan lakukan apa-apa. Biarkan tampilan yang lama tetap muncul.
+        
+        if (isInitialLoad && antrianData.length === 0) {
+          // Hanya tampilkan pesan standby jika ini load pertama kali DAN internet mati
+          renderStandbyError();
+        }
       }
+    }
+
+    // Tampilan khusus saat internet mati di awal load
+    function renderStandbyError() {
+      const board = document.getElementById('antrianBoard');
+      board.innerHTML = `
+        <div class="card-dokter active" style="background: white; color: #000;">
+          <i class="fa-solid fa-wifi text-6xl mb-4 text-red-400"></i>
+          <h2 class="nama-dokter font-black uppercase" style="border:none">Koneksi Terputus</h2>
+          <p class="label-antrian text-gray-400 font-bold animate-pulse">Mencoba menghubungkan kembali...</p>
+        </div>`;
     }
 
     function renderEmpty() {
       const board = document.getElementById('antrianBoard');
+      // Pastikan rotasi dihentikan jika data kosong
+      if (rotationInterval) clearInterval(rotationInterval);
+      
       board.innerHTML = `
         <div class="card-dokter active" style="background: white; color: #000;">
           <i class="fa-solid fa-hospital-user text-6xl mb-4 text-gray-300"></i>
           <h2 class="nama-dokter font-black uppercase" style="border:none">Antrian Belum Dimulai</h2>
-          <p class="label-antrian text-gray-400">Silakan menunggu panggilan petugas</p>
+          <p class="label-antrian text-gray-400 font-bold uppercase tracking-widest">Petugas belum memanggil pasien</p>
         </div>`;
     }
 
@@ -259,8 +286,10 @@
     function startRotation() {
       if (rotationInterval) clearInterval(rotationInterval);
       if (antrianData.length === 0) return;
+      
       currentIndex = 0;
       showCard(0);
+      
       if (antrianData.length > 1) {
         rotationInterval = setInterval(() => {
           hideCard(currentIndex);
@@ -289,7 +318,9 @@
 
     // Jalankan Loop
     updateDisplay();
-    setInterval(updateDisplay, 60000); // Update data tiap 60 detik
+    // Interval update dipercepat ke 10-30 detik agar lebih responsif terhadap panggilan petugas
+    setInterval(updateDisplay, 15000); 
+    
     setInterval(() => {
       document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID');
     }, 1000);
