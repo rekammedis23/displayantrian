@@ -85,13 +85,15 @@
       transform: scale(0.95);
       transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       visibility: hidden;
+      pointer-events: none;
     }
 
     .card-dokter.active { 
       opacity: 1; 
       transform: scale(1); 
       visibility: visible; 
-      z-index: 10; 
+      z-index: 10;
+      pointer-events: auto;
     }
 
     .nama-dokter { 
@@ -128,6 +130,12 @@
       background: white;
       color: #16a34a;
       margin-top: 10px;
+      animation: pulse-btn 2s infinite;
+    }
+
+    @keyframes pulse-btn {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
     }
 
     .marquee-container {
@@ -137,6 +145,23 @@
       align-items: center;
       flex-shrink: 0;
     }
+
+    /* Status Indicator */
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .status-live { background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse-green 2s infinite; }
+    .status-standby { background: #eab308; box-shadow: 0 0 8px #eab308; }
+    .status-error { background: #ef4444; box-shadow: 0 0 8px #ef4444; animation: pulse-red 1s infinite; }
+    .status-loading { background: #3b82f6; animation: pulse-blue 1s infinite; }
+    
+    @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    @keyframes pulse-blue { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
     @media (max-width: 768px) {
       body { overflow-y: auto; height: auto; }
@@ -152,7 +177,13 @@
 
   <div class="header-box neo-box bg-yellow-400">
     <h1 class="text-2xl font-black uppercase tracking-tighter">RS SS Medika</h1>
-    <div id="clock" class="text-2xl font-black">00:00:00</div>
+    <div class="flex items-center gap-3">
+      <div id="connectionStatus" class="flex items-center text-sm font-bold">
+        <span class="status-dot status-loading" id="statusDot"></span>
+        <span id="statusText">LOADING...</span>
+      </div>
+      <div id="clock" class="text-2xl font-black">00:00:00</div>
+    </div>
   </div>
 
   <div class="main-layout">
@@ -177,7 +208,7 @@
     <div id="antrianBoard">
       <div class="card-dokter active" style="background: white; color: #000;">
         <i class="fa-solid fa-circle-info text-4xl mb-4 text-blue-600"></i>
-        <h2 class="nama-dokter font-black uppercase" style="border:none">Antrian Belum Dimulai</h2>
+        <h2 class="nama-dokter font-black uppercase" style="border:none; color:#000">Antrian Belum Dimulai</h2>
         <p class="text-sm font-bold text-gray-400 animate-pulse uppercase tracking-widest">Menunggu Data Dari Server...</p>
       </div>
     </div>
@@ -190,99 +221,164 @@
 <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec"; 
 
-    // === STATE MANAGEMENT ===
-    let currentIndex = 0;
-    let antrianData = [];
-    let rotationInterval;
-    
-    // === ANTI-FLICKER CONFIG ===
-    let emptyResponseCount = 0;           // Hitung response kosong berturut-turut
-    const EMPTY_CONFIRM_THRESHOLD = 3;    // Tampilkan "empty" hanya setelah 3x response kosong
-    let lastValidData = null;             // Cache data terakhir yang valid
-    let lastRenderedSignature = null;     // Signature data untuk deteksi perubahan
-    let hasReceivedValidData = false;     // Flag: pernah terima data valid?
-    let rotationStartTime = null;         // Waktu mulai rotasi untuk minimum display time
-    const MIN_CARD_DISPLAY_TIME = 8000;   // Minimal 8 detik per card sebelum bisa ganti
+    // === CONFIG: Anti-Flicker & State Management ===
+    const CONFIG = {
+      EMPTY_CONFIRM_COUNT: 5,           // Butuh 5x response kosong berturut-turut baru tampilkan empty
+      VALID_CONFIRM_COUNT: 1,           // Cukup 1x data valid langsung update
+      GRACE_PERIOD_MS: 45000,           // Setelah dapat data valid, beri 45 detik grace sebelum bisa ke empty
+      MAX_DATA_AGE_MS: 30000,           // Abaikan data yang lebih tua dari 30 detik
+      MIN_CARD_DISPLAY_TIME: 8000,      // Minimal 8 detik per card sebelum rotasi
+      POLLING_INTERVAL: 15000           // Polling setiap 15 detik
+    };
 
-    // Generate signature unik untuk deteksi perubahan data
+    // === STATE ===
+    let state = {
+      antrianData: [],
+      lastValidData: null,
+      lastValidTimestamp: null,
+      lastRenderedSignature: null,
+      emptyResponseStreak: 0,
+      validResponseStreak: 0,
+      currentMode: 'loading',          // 'loading' | 'queue' | 'empty' | 'error'
+      gracePeriodEnd: null,
+      rotationStartTime: null,
+      currentIndex: 0,
+      rotationInterval: null,
+      hasReceivedValidData: false
+    };
+
+    let rotationInterval = null; // Global reference for cleanup
+
+    // === SIGNATURE & UTILS ===
     function getDataSignature(data) {
       if (!data || data.length === 0) return 'empty';
-      return data.map(d => `${d.dokter?.trim()}:${d.no_antrian?.trim()}`).sort().join('|');
+      return data
+        .map(d => `${String(d.dokter||'').trim()}:${String(d.no_antrian||'').trim()}`)
+        .sort()
+        .join('|')
+        .substring(0, 150);
     }
 
+    function updateConnectionStatus(mode, extra = '') {
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      
+      const states = {
+        'queue': { class: 'status-live', label: `LIVE • ${extra || 'Antrian Aktif'}` },
+        'empty': { class: 'status-standby', label: 'STANDBY • Menunggu Pasien' },
+        'error': { class: 'status-error', label: 'OFFLINE • Menggunakan Cache' },
+        'loading': { class: 'status-loading', label: 'LOADING...' }
+      };
+      
+      const s = states[mode] || states.loading;
+      dot.className = `status-dot ${s.class}`;
+      text.textContent = s.label;
+    }
+
+    // === MAIN UPDATE FUNCTION ===
     async function updateDisplay() {
       try {
-        const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`, { 
+        const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`, {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
         });
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
         const result = await response.json();
         
-        if (result.success) {
-          const data = result.data;
-          const currentSignature = getDataSignature(data);
-          
-          // === HANDLE EMPTY DATA DENGAN KONFIRMASI ===
-          if (!data || data.length === 0) {
-            emptyResponseCount++;
-            
-            // Hanya tampilkan empty state jika sudah terkonfirmasi (bukan glitch sesaat)
-            if (emptyResponseCount >= EMPTY_CONFIRM_THRESHOLD) {
-              // Jika sebelumnya ada data valid, jangan langsung hapus - beri jeda
-              if (hasReceivedValidData && lastValidData?.length > 0) {
-                // Masih tampilkan data terakhir selama beberapa cycle lagi
-                return;
-              }
-              // Baru tampilkan empty state jika benar-benar confirmed
-              antrianData = [];
-              lastValidData = null;
-              hasReceivedValidData = false;
-              renderEmpty();
-              stopRotation();
-            }
-            return; // Jangan re-render jika belum confirmed empty
-          }
-          
-          // === RESET COUNTER SAAT DAPAT DATA VALID ===
-          emptyResponseCount = 0;
-          lastValidData = data;
-          hasReceivedValidData = true;
-          
-          // === ANTI-FLICKER: Hanya re-render jika data benar-benar berubah ===
-          if (currentSignature !== lastRenderedSignature) {
-            antrianData = data;
-            lastRenderedSignature = currentSignature;
-            renderCards();
-            startRotation();
-          }
-          // Jika signature sama, tidak perlu re-render (hindari flicker)
-          
+        if (!result.success) throw new Error(result.error || 'Unknown error');
+        
+        const data = result.data || [];
+        const now = Date.now();
+        
+        // ✅ Validasi timestamp (abaikan data stale)
+        if (result.timestamp && (now - result.timestamp > CONFIG.MAX_DATA_AGE_MS)) {
+          console.warn(`⚠️ Data terlalu lama (${Math.round((now-result.timestamp)/1000)}s), diabaikan`);
+          return;
         }
+        
+        // ✅ Handle fallback flag dari backend
+        if (result.meta?.is_fallback) {
+          console.log(`🔄 Using fallback: ${result.meta.fallback_reason}`);
+          // Tetap proses data, tapi jangan reset emptyStreak
+        }
+        
+        const currentSignature = getDataSignature(data);
+        
+        // === CASE 1: Dapat data valid (antrian ada) ===
+        if (data.length > 0) {
+          state.emptyResponseStreak = 0;
+          state.validResponseStreak++;
+          
+          if (state.validResponseStreak >= CONFIG.VALID_CONFIRM_COUNT) {
+            state.antrianData = data;
+            state.lastValidData = data;
+            state.lastValidTimestamp = now;
+            state.gracePeriodEnd = now + CONFIG.GRACE_PERIOD_MS;
+            state.hasReceivedValidData = true;
+            state.currentMode = 'queue';
+            
+            // Hanya re-render jika signature berubah
+            if (currentSignature !== state.lastRenderedSignature) {
+              state.lastRenderedSignature = currentSignature;
+              renderCards();
+              startRotation();
+            }
+            updateConnectionStatus('queue', `${data.length} dokter aktif`);
+          }
+          return;
+        }
+        
+        // === CASE 2: Dapat data kosong ===
+        state.validResponseStreak = 0;
+        state.emptyResponseStreak++;
+        
+        // Jika dalam grace period, abaikan empty response
+        if (state.gracePeriodEnd && now < state.gracePeriodEnd) {
+          console.log(`⏳ Grace period aktif (${Math.round((state.gracePeriodEnd-now)/1000)}s tersisa)`);
+          return;
+        }
+        
+        // Hanya tampilkan empty state jika sudah terkonfirmasi
+        if (state.emptyResponseStreak >= CONFIG.EMPTY_CONFIRM_COUNT) {
+          state.currentMode = 'empty';
+          state.antrianData = [];
+          state.lastRenderedSignature = 'empty';
+          renderEmpty();
+          stopRotation();
+          updateConnectionStatus('empty');
+        }
+        
       } catch (err) {
-        console.error("Gagal memuat antrian:", err);
+        console.error("❌ Fetch error:", err.message);
         
-        // === HANDLE ERROR KONEKSI ===
-        emptyResponseCount++;
+        state.emptyResponseStreak++;
         
-        // Jangan tampilkan error/empty jika sebelumnya sudah ada data valid
-        if (emptyResponseCount >= EMPTY_CONFIRM_THRESHOLD && !hasReceivedValidData) {
+        // Jika masih ada data valid dan dalam grace period, tetap tampilkan
+        if (state.lastValidData && (!state.gracePeriodEnd || Date.now() < state.gracePeriodEnd)) {
+          console.log("🔄 Koneksi error, tetap tampilkan data terakhir");
+          updateConnectionStatus('error');
+          return;
+        }
+        
+        // Tampilkan error hanya jika benar-benar tidak ada fallback
+        if (state.emptyResponseStreak >= CONFIG.EMPTY_CONFIRM_COUNT) {
+          state.currentMode = 'error';
           renderStandbyError();
           stopRotation();
+          updateConnectionStatus('error');
         }
-        // Jika sudah pernah dapat data valid, tetap tampilkan data terakhir (graceful degradation)
       }
     }
 
+    // === RENDER FUNCTIONS ===
     function renderStandbyError() {
       const board = document.getElementById('antrianBoard');
       stopRotation();
       board.innerHTML = `
         <div class="card-dokter active" style="background: white; color: #000;">
           <i class="fa-solid fa-wifi text-6xl mb-4 text-red-400"></i>
-          <h2 class="nama-dokter font-black uppercase" style="border:none">Koneksi Terputus</h2>
+          <h2 class="nama-dokter font-black uppercase" style="border:none; color:#000">Koneksi Terputus</h2>
           <p class="label-antrian text-gray-400 font-bold animate-pulse">Mencoba menghubungkan kembali...</p>
         </div>`;
     }
@@ -292,34 +388,40 @@
       stopRotation();
       
       // Hindari re-render jika sudah dalam state empty
-      if (board.querySelector('.empty-state')) return;
+      if (state.currentMode === 'empty' && board.querySelector('.empty-state')) return;
       
       board.innerHTML = `
         <div class="card-dokter active empty-state" style="background: white; color: #000;">
           <i class="fa-solid fa-hospital-user text-6xl mb-4 text-gray-300"></i>
-          <h2 class="nama-dokter font-black uppercase" style="border:none">Antrian Belum Dimulai</h2>
+          <h2 class="nama-dokter font-black uppercase" style="border:none; color:#000">Antrian Belum Dimulai</h2>
           <p class="label-antrian text-gray-400 font-bold uppercase tracking-widest">Petugas belum memanggil pasien</p>
         </div>`;
     }
 
     function renderCards() {
       const board = document.getElementById('antrianBoard');
+      const { antrianData } = state;
       
-      // Hindari re-render jika data sama dan cards sudah ada
+      // Optimasi: Update content saja jika DOM sudah ada dan signature sama
       const existingCards = board.querySelectorAll('.card-dokter:not(.empty-state)');
-      if (existingCards.length === antrianData.length && lastRenderedSignature) {
-        // Update content saja tanpa re-build DOM jika memungkinkan
+      if (existingCards.length === antrianData.length && state.lastRenderedSignature) {
         antrianData.forEach((item, index) => {
           const card = document.getElementById(`card-${index}`);
           if (card) {
-            card.querySelector('.nama-dokter').textContent = item.dokter?.toUpperCase() || '';
-            card.querySelector('.number-display').textContent = item.no_antrian || '';
+            const namaEl = card.querySelector('.nama-dokter');
+            const noEl = card.querySelector('.number-display');
+            if (namaEl && namaEl.textContent !== (item.dokter?.toUpperCase()||'')) {
+              namaEl.textContent = item.dokter?.toUpperCase() || '-';
+            }
+            if (noEl && noEl.textContent !== (item.no_antrian||'')) {
+              noEl.textContent = item.no_antrian || '-';
+            }
           }
         });
         return;
       }
       
-      // Build fresh cards hanya jika benar-benar perlu
+      // Build fresh cards
       let html = '';
       antrianData.forEach((item, index) => {
         html += `
@@ -335,43 +437,40 @@
       board.innerHTML = html;
     }
 
+    // === ROTATION LOGIC ===
     function startRotation() {
-      stopRotation(); // Pastikan interval lama dihentikan dulu
+      stopRotation();
+      if (state.antrianData.length === 0) return;
       
-      if (antrianData.length === 0) return;
-      
-      currentIndex = 0;
-      rotationStartTime = Date.now();
+      state.currentIndex = 0;
+      state.rotationStartTime = Date.now();
       showCard(0);
       
-      // Hanya mulai rotasi jika ada lebih dari 1 card
-      if (antrianData.length > 1) {
-        rotationInterval = setInterval(() => {
-          // Pastikan card sudah ditampilkan minimal MIN_CARD_DISPLAY_TIME
-          const elapsed = Date.now() - rotationStartTime;
-          if (elapsed < MIN_CARD_DISPLAY_TIME) return;
+      if (state.antrianData.length > 1) {
+        state.rotationInterval = setInterval(() => {
+          const elapsed = Date.now() - state.rotationStartTime;
+          if (elapsed < CONFIG.MIN_CARD_DISPLAY_TIME) return;
           
-          hideCard(currentIndex);
-          currentIndex = (currentIndex + 1) % antrianData.length;
-          rotationStartTime = Date.now();
-          showCard(currentIndex);
-        }, 1000); // Cek setiap 1 detik, tapi hanya ganti card setelah minimal time terpenuhi
+          hideCard(state.currentIndex);
+          state.currentIndex = (state.currentIndex + 1) % state.antrianData.length;
+          state.rotationStartTime = Date.now();
+          showCard(state.currentIndex);
+        }, 1000); // Check every 1s, but only rotate after min time
       }
     }
 
     function stopRotation() {
-      if (rotationInterval) {
-        clearInterval(rotationInterval);
-        rotationInterval = null;
+      if (state.rotationInterval) {
+        clearInterval(state.rotationInterval);
+        state.rotationInterval = null;
       }
-      rotationStartTime = null;
+      state.rotationStartTime = null;
     }
 
     function showCard(index) {
       const el = document.getElementById(`card-${index}`);
       if (el) {
         el.classList.add('active');
-        // Pastikan card lain tidak active
         document.querySelectorAll('.card-dokter').forEach(c => {
           if (c.id !== `card-${index}`) c.classList.remove('active');
         });
@@ -383,11 +482,12 @@
       if (el) el.classList.remove('active');
     }
 
+    // === VIDEO CHANNEL ===
     function changeChannel() {
       const selector = document.getElementById('channelSelector');
       const player = document.getElementById('videoPlayer');
       const val = selector.value;
-      // Preserve autoplay & mute settings
+      
       if (val === 'yt_default') {
         player.src = "https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8";
       } else {
@@ -395,24 +495,38 @@
       }
     }
 
-    // === INITIALIZATION ===
-    updateDisplay();
-    setInterval(updateDisplay, 15000); // Polling setiap 15 detik
-    
-    // Clock update
-    setInterval(() => {
-      const clock = document.getElementById('clock');
-      if (clock) clock.innerText = new Date().toLocaleTimeString('id-ID');
-    }, 1000);
-    
-    // Handle page visibility untuk pause rotation saat tab tidak aktif (hemat resource)
+    // === PAGE VISIBILITY ===
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         stopRotation();
-      } else if (antrianData.length > 0) {
+      } else if (state.antrianData.length > 0 && state.currentMode === 'queue') {
         startRotation();
       }
     });
+
+    // === INITIALIZATION ===
+    (function init() {
+      updateConnectionStatus('loading');
+      updateDisplay();
+      setInterval(updateDisplay, CONFIG.POLLING_INTERVAL);
+      
+      setInterval(() => {
+        const clock = document.getElementById('clock');
+        if (clock) clock.innerText = new Date().toLocaleTimeString('id-ID', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+      }, 1000);
+      
+      // Debug: Tekan 'D' untuk clear cache & force refresh
+      document.addEventListener('keydown', (e) => {
+        if (e.key.toLowerCase() === 'd' && e.ctrlKey) {
+          e.preventDefault();
+          console.log('🔄 Force refresh...');
+          state.lastRenderedSignature = null;
+          updateDisplay();
+        }
+      });
+    })();
   </script>
 </body>
 </html>
