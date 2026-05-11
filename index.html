@@ -278,10 +278,8 @@
     // === MAIN UPDATE FUNCTION ===
     async function updateDisplay() {
       try {
-        const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' }
-        });
+        // ✅ Gunakan GET request sederhana tanpa custom headers
+        const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`);
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
