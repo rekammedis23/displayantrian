@@ -192,12 +192,12 @@
     <marquee class="text-2xl font-black uppercase">Selamat Datang di RS SS Medika • Harap Menunggu Antrian Anda • Semoga Lekas Sembuh</marquee>
   </div>
 
-  <script>
-    // 🔥 GANTI DENGAN URL WEB APP GAS ANDA (HASIL DEPLOYMENT)
+<script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbz1NimF8Y9P4tI1u8wK_nK5abX6EI0yF3kY63ywlF38oeh-58jc6-rTHXAB7ry0sVfg/exec"; 
 
     let currentIndex = 0;
     let antrianData = [];
+    let lastValidData = []; // Menyimpan cache data terakhir
     let rotationInterval;
 
     async function updateDisplay() {
@@ -205,26 +205,28 @@
         const response = await fetch(`${GAS_URL}?action=getAntrianDisplay`);
         const result = await response.json();
         
-        // Jika sukses tetapi data kosong (belum ada yang dipanggil)
         if (result.success) {
           const data = result.data;
           
+          // Jika data kosong dari server
           if (!data || data.length === 0) {
-            antrianData = []; // Kosongkan data lokal
-            renderEmpty();    // Tampilkan pesan "Belum ada antrian"
+            // Jika sebelumnya pernah ada data, jangan diubah (tetap tampilkan yang lama)
+            if (lastValidData.length === 0) {
+              renderEmpty();
+            }
             return;
           }
           
-          // Render kartu hanya jika data berbeda (mencegah flicker)
-          if (JSON.stringify(antrianData) !== JSON.stringify(data)) {
+          // Render ulang hanya jika data benar-benar berubah untuk menghindari kedipan
+          if (JSON.stringify(lastValidData) !== JSON.stringify(data)) {
             antrianData = data;
+            lastValidData = data;
             renderCards();
           }
         }
       } catch (err) {
         console.error("Gagal memuat antrian:", err);
-        // Jika koneksi internet putus, tetap tampilkan pesan standby agar tidak stuck di loading
-        renderEmpty(); 
+        // Jika error jaringan, biarkan tampilan yang sudah ada tetap tampil
       }
     }
 
@@ -233,7 +235,7 @@
       board.innerHTML = `
         <div class="card-dokter active" style="background: white; color: #000;">
           <i class="fa-solid fa-hospital-user text-6xl mb-4 text-gray-300"></i>
-          <h2 class="nama-dokter font-black uppercase" style="border:none">Antrian Belum Dimulai</h2>
+          <h2 class="nama-dokter font-black uppercase" style="border:none">Sistem Antrian Aktif</h2>
           <p class="label-antrian text-gray-400">Silakan menunggu panggilan petugas</p>
         </div>`;
     }
@@ -259,8 +261,10 @@
     function startRotation() {
       if (rotationInterval) clearInterval(rotationInterval);
       if (antrianData.length === 0) return;
+      
       currentIndex = 0;
       showCard(0);
+      
       if (antrianData.length > 1) {
         rotationInterval = setInterval(() => {
           hideCard(currentIndex);
@@ -287,9 +291,13 @@
       player.src = (val === 'yt_default' ? "https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8" : val);
     }
 
-    // Jalankan Loop
+    // Jalankan pertama kali
     updateDisplay();
-    setInterval(updateDisplay, 60000); // Update data tiap 60 detik
+
+    // Pengecekan data setiap 10 detik agar lebih responsif
+    setInterval(updateDisplay, 10000); 
+
+    // Update Jam
     setInterval(() => {
       document.getElementById('clock').innerText = new Date().toLocaleTimeString('id-ID');
     }, 1000);
