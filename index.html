@@ -57,9 +57,14 @@
       background: #000;
       overflow: hidden;
     }
-    .video-frame iframe {
-      position: absolute; width: 100%; height: 100%; top: 0; left: 0;
-    }
+.video-frame iframe {
+  position: absolute; 
+  width: 100%; 
+  height: 100%; 
+  top: 0; 
+  left: 0;
+  object-fit: contain; /* Memastikan video Shorts tidak ketarik/gepeng dan tetap proporsional di tengah */
+}
 
     /* ANTRIAN BOARD REPAIR */
     #antrianBoard {
@@ -168,7 +173,11 @@
                 <option value="yt_default">YouTube (Default)</option>
                 <!-- BARIS BARU DIBAWAH INI -->
                 <option value="https://www.youtube.com/embed/Na1PWpDca_A?autoplay=1&mute=1&loop=1&playlist=Na1PWpDca_A">YouTube (Live ANTV)</option>
-                
+                <!-- PLAYLIST AUTOMATIS SHORTS YOUTUBE -->
+                <!-- Video pertama dimulai dari pYm77m_M_Aw, lalu berlanjut ke video berikutnya di daftar playlist -->
+                <option value="https://www.youtube.com/embed/GW82lAf5IJ8?autoplay=1&mute=1&loop=1&playlist=GW82lAf5IJ8,t-s8HVup-OU,S-bOCH41Gdc">
+                  📺 PLAYLIST SHORTS (Edukasi)
+                </option>
                 <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGcmN0i">RCTI</option>
                 <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGZ3R2JTJGaW5ld3NpZCZoZWlnaHQ9MTAwJTI1JndpZHRoPTEwMCUyNQ==">GTV</option>
                 <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGbW5jdHYlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">MNCTV</option>
