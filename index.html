@@ -162,22 +162,25 @@
 
   <div class="main-layout">
     <div class="video-container">
-      <div class="video-frame neo-box">
-        <div class="absolute top-2 left-2 z-50 opacity-50 hover:opacity-100">
-          <select id="channelSelector" onchange="changeChannel()" class="bg-black text-white text-xs p-1 font-bold border-2 border-white rounded">
-              <option value="yt_default">YouTube (Default)</option>
-              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGcmN0aSUyRmluZXdzaWQmaGVpZ2h0PTEwMCUyNSZ3aWR0aD0xMDAlMjU=">RCTI</option>
-              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGZ3R2JTJGaW5ld3NpZCZoZWlnaHQ9MTAwJTI1JndpZHRoPTEwMCUyNQ==">GTV</option>
-              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGbW5jdHYlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">MNCTV</option>
-              <option value="https://20.detik.com/watch/livestreaming-transtv">TRANS TV</option>
-              <option value="https://20.detik.com/watch/livestreaming-trans7">TRANS 7</option>
-              <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGaW5ld3MlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">iNews</option>
-              <option value="https://www.cnnindonesia.com/tv/embed?ref=transmedia">CNN</option>
-          </select>
+        <div class="video-frame neo-box">
+          <div class="absolute top-2 left-2 z-50 opacity-50 hover:opacity-100">
+            <select id="channelSelector" onchange="changeChannel()" class="bg-black text-white text-xs p-1 font-bold border-2 border-white rounded">
+                <option value="yt_default">YouTube (Default)</option>
+                <!-- BARIS BARU DIBAWAH INI -->
+                <option value="https://www.youtube.com/embed/Na1PWpDca_A?autoplay=1&mute=1&loop=1&playlist=Na1PWpDca_A">YouTube (Live Baru)</option>
+                
+                <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGcmN0i">RCTI</option>
+                <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGZ3R2JTJGaW5ld3NpZCZoZWlnaHQ9MTAwJTI1JndpZHRoPTEwMCUyNQ==">GTV</option>
+                <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGbW5jdHYlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">MNCTV</option>
+                <option value="https://20.detik.com/watch/livestreaming-transtv">TRANS TV</option>
+                <option value="https://20.detik.com/watch/livestreaming-trans7">TRANS 7</option>
+                <option value="https://sindikasi.inews.id/embed/video/YWdlbnQ9ZGVza3RvcCZ1cmw9aHR0cHMlM0ElMkYlMkZlbWJlZC5yY3RpcGx1cy5jb20lMkZsaXZlJTJGaW5ld3MlMkZpbmV3c2lkJmhlaWdodD0xMDAlMjUmd2lkdGg9MTAwJTI1">iNews</option>
+                <option value="https://www.cnnindonesia.com/tv/embed?ref=transmedia">CNN</option>
+            </select>
+          </div>
+          <iframe id="videoPlayer" src="https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8" frameborder="0" allow="autoplay; encrypted-media; fullscreen"></iframe>
         </div>
-        <iframe id="videoPlayer" src="https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8" frameborder="0" allow="autoplay; encrypted-media; fullscreen"></iframe>
       </div>
-    </div>
 
     <div id="antrianBoard">
       <div class="card-dokter active" style="background: white; color: #000;">
@@ -288,7 +291,19 @@
       const selector = document.getElementById('channelSelector');
       const player = document.getElementById('videoPlayer');
       const val = selector.value;
-      player.src = (val === 'yt_default' ? "https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8" : val);
+      
+      if (val === 'yt_default') {
+        player.src = "https://www.youtube.com/embed/Vf4HfpPTuB8?autoplay=1&mute=1&loop=1&playlist=Vf4HfpPTuB8";
+      } else {
+        // Jika link mengandung kata 'youtube.com', jalankan langsung karena parameter sudah kita set di HTML
+        if (val.includes('youtube.com')) {
+          player.src = val;
+        } else {
+          // Jika link dari sindikasi berita/TV lain, tambahkan otomatis parameter autoplay & mute di ujungnya
+          const separator = val.includes('?') ? '&' : '?';
+          player.src = val + separator + "autoplay=1&mute=1";
+        }
+      }
     }
 
     // Jalankan pertama kali
